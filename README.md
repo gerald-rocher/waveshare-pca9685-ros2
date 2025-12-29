@@ -1,5 +1,13 @@
 # servo_controller
 
+
+<p float="left">
+  <img src="images/rpi4.png" height="200" />
+  <img src="images/waveshare_pca9685_hat.png" height="200" />
+  <img src="images/ros2_humble.png" height="200" />
+</p>
+
+
 ROS2 Humble package to control a Waveshare 16-Channel Servo Driver HAT (PCA9685)
 from a Raspberry Pi using I2C. See [wiki](https://www.waveshare.com/wiki/Servo_Driver_HAT).
 
