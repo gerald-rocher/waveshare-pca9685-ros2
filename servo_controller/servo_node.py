@@ -18,7 +18,7 @@ class PCA9685:
     def __init__(self, address=0x40, bus=1):
         self.bus = smbus.SMBus(bus)
         self.address = address
-        self.bus.write_byte_data(self.address, self.__MODE1, 0x00)
+        self.bus.write_byte_data(self.address, self.__MODE1, 0x20) # activate auto increment
 
     def set_pwm_freq(self, freq):
         prescaleval = 25000000.0
@@ -33,13 +33,36 @@ class PCA9685:
         self.bus.write_byte_data(self.address, self.__PRESCALE, prescale)
         self.bus.write_byte_data(self.address, self.__MODE1, oldmode)
         time.sleep(0.005)
-        self.bus.write_byte_data(self.address, self.__MODE1, oldmode | 0x80)
+        self.bus.write_byte_data(self.address, self.__MODE1, oldmode | 0xA0) # Auto increment + restart 
 
     def set_pwm(self, channel, on, off):
         self.bus.write_byte_data(self.address, self.__LED0_ON_L + 4 * channel, on & 0xFF)
         self.bus.write_byte_data(self.address, self.__LED0_ON_H + 4 * channel, on >> 8)
         self.bus.write_byte_data(self.address, self.__LED0_OFF_L + 4 * channel, off & 0xFF)
         self.bus.write_byte_data(self.address, self.__LED0_OFF_H + 4 * channel, off >> 8)
+
+    def set_all_pwm(self, pulses_us):
+        pulses = pulses_us[:16]
+        pulses += [0] * (16 - len(pulses))
+
+        data = []
+        for pulse_us in pulses:
+            pulse = int(pulse_us * 4096 / 20000)
+            pulse = max(0, min(4095, pulse))
+            data.extend([0,0, pulse & 0xFF, pulse >> 8])
+
+        # Write two 32 octets blocs
+        self.bus.write_i2c_block_data(
+            self.address,
+            self.__LED0_ON_L,
+            data[0:32]
+        )
+
+        self.bus.write_i2c_block_data(
+            self.address,
+            self.__LED0_ON_L + 32,
+            data[32:64]
+        )
 
     def set_servo_pulse(self, channel, pulse_us):
         pulse = int(pulse_us * 4096 / 20000)
@@ -70,6 +93,7 @@ class ServoControllerNode(Node):
         return int(self.MIN_PULSE + (angle / 180.0) * (self.MAX_PULSE - self.MIN_PULSE))
 
     def command_callback(self, msg):
+        '''
         for channel, angle in enumerate(msg.data):
             if channel >= 16:
                 break
@@ -80,6 +104,10 @@ class ServoControllerNode(Node):
             #self.get_logger().info(
             #    f"Servo {channel}: angle={angle}° pulse={pulse}us"
             #)
+        '''
+        angles = msg.data[:16]
+        pulses = [self.angle_to_pulse(a) for a in angles]
+        self.pwm.set_all_pwm(pulses)
 
 
 def main(args=None):
