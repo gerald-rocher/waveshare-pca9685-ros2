@@ -88,27 +88,83 @@ class ServoControllerNode(Node):
             10
         )
 
-    def angle_to_pulse(self, angle):
-        angle = max(0, min(180, angle))
-        return int(self.MIN_PULSE + (angle / 180.0) * (self.MAX_PULSE - self.MIN_PULSE))
+        self.servo_dir = [
+              1, # bucket
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+             -1, # gripper
+             -1, # gripper_support
+              1,
+              1
+        ]
+
+        self.servo_min_angle = [
+              0, # bucket
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0, # gripper
+            -20, # gripper_support
+              0,
+              0
+        ]
+
+        self.servo_max_angle = [
+             90, # bucket
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+             45, # gripper
+             10, # gripper_support
+              0,
+              0
+        ]
+
+    def angle_to_pulse(self, channel, angle):
+        angle = max(-90, min(90, angle))
+
+        angle = self.servo_dir[channel] * angle
+
+        pulse = int(
+            (self.MIN_PULSE + self.MAX_PULSE)//2 +
+            (angle / 90.0) * ((self.MAX_PULSE - self.MIN_PULSE)//2)
+        )
+        return pulse
 
     def command_callback(self, msg):
-        '''
-        for channel, angle in enumerate(msg.data):
-            if channel >= 16:
-                break
-
-            pulse = self.angle_to_pulse(angle)
-            self.pwm.set_servo_pulse(channel, pulse)
-
-            #self.get_logger().info(
-            #    f"Servo {channel}: angle={angle}° pulse={pulse}us"
-            #)
-        '''
         angles = msg.data[:16]
-        pulses = [self.angle_to_pulse(a) for a in angles]
-        self.pwm.set_all_pwm(pulses)
 
+        for ch in range(len(angles)):
+            if angles[ch] < self.servo_min_angle[ch] or angles[ch] > self.servo_max_angle[ch]:
+                angles[ch] = 0
+
+        pulses = [self.angle_to_pulse(ch, angle) for ch, angle in enumerate(angles)]
+        self.pwm.set_all_pwm(pulses)
 
 def main(args=None):
     rclpy.init(args=args)
